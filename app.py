@@ -1,85 +1,110 @@
-import os
-import base64
-import cv2
-import numpy as np
-import pytesseract
-from PIL import Image
-import io
-from flask import Flask, render_template, request, jsonify
+import json
+import time
+
+import ollama
+from flask import Flask, jsonify, render_template, request
 
 app = Flask(__name__)
 
-# Dacă ești pe Windows, verifică calea către tesseract.exe
-# pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
-def preprocess_for_ocr(image_bytes):
-    # 1. Transformăm byte-urile în format OpenCV
-    nparr = np.frombuffer(image_bytes, np.uint8)
-    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+OLLAMA_MODEL = "llama3.2-vision"
 
-    # 2. Convertim în GrayScale (alb-negru)
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+print(f"SolveX Air pornit. Folosim Ollama (Model: {OLLAMA_MODEL})")
 
-    # 3. Mărim imaginea (Resizing) - Tesseract citește mai bine caracterele mari
-    gray = cv2.resize(gray, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
 
-    # 4. Binarizare (Thresholding) - transformăm tot ce e scris în negru pur pe fundal alb pur
-    # Folosim OTSU pentru a calcula automat pragul optim de contrast
-    _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-
-    # 5. Dilation (Îngroșarea liniilor) - ajută dacă ai scris cu un creier subțire
-    kernel = np.ones((2,2), np.uint8)
-    thresh = cv2.dilate(thresh, kernel, iterations=1)
-
-    # 6. Invertim înapoi (Tesseract preferă text negru pe fundal alb)
-    final_img = cv2.bitwise_not(thresh)
-    
-    return final_img
-
-@app.route('/')
+@app.route("/")
 def index():
-    return render_template('index.html')
+    return render_template("index.html")
 
-@app.route('/process_math', methods=['POST'])
-def process_math():
+
+def extract_base64_image(image_data):
+    if not image_data or "," not in image_data:
+        raise ValueError("Nu am primit o imagine valida.")
+    return image_data.split(",", 1)[1]
+
+
+def read_ollama_json(raw_text):
+    raw_text = raw_text.strip()
     try:
-        data = request.json
-        image_data = data.get('image_data')
-        encoded_data = image_data.split(',')[1]
-        image_bytes = base64.b64decode(encoded_data)
+        return json.loads(raw_text)
+    except json.JSONDecodeError:
+        start = raw_text.find("{")
+        end = raw_text.rfind("}")
+        if start != -1 and end != -1 and end > start:
+            return json.loads(raw_text[start:end + 1])
+        raise
 
-        processed_img = preprocess_for_ocr(image_bytes)
 
-        # Folosim PSM 6 sau 7 și permitem citirea caracterelor matematice
-        custom_config = r'--oem 3 --psm 6 -c tessedit_char_whitelist=0123456789+-*/() '
-        detected_equation = pytesseract.image_to_string(processed_img, config=custom_config).strip()
+def normalize_steps(steps):
+    if isinstance(steps, list):
+        return "\n".join(str(step) for step in steps)
+    return steps or ""
 
-        # FIX pentru erori comune de OCR:
-        # Dacă Tesseract vede paranteze ca cifre, încercăm să curățăm
-        detected_equation = "".join(detected_equation.split())
-        
-        # Validare paranteze: dacă avem paranteză închisă dar nu și deschisă
-        if ")" in detected_equation and "(" not in detected_equation:
-            # Dacă ecuația începe cu o cifră care pare a fi paranteză (ex: 3 în loc de ()
-            if detected_equation[0] in "317": 
-                detected_equation = "(" + detected_equation[1:]
 
-        try:
-            # Calculăm rezultatul
-            result = eval(detected_equation, {"__builtins__": None}, {})
-            return jsonify({
+def build_prompt(step_by_step):
+    if step_by_step:
+        return """
+Esti profesor de matematica. Citeste ecuatia din imagine si rezolv-o.
+Raspunde DOAR cu JSON valid, fara markdown:
+{
+  "equation": "ecuatia citita",
+  "answer": "rezultatul final",
+  "steps": ["pas scurt 1", "pas scurt 2", "pas scurt 3"]
+}
+Pastreaza explicatia scurta, clara si corecta. Maximum 6 pasi.
+"""
+
+    return """
+Esti un calculator matematic rapid. Citeste ecuatia din imagine si rezolv-o.
+Raspunde DOAR cu JSON valid, fara markdown:
+{
+  "equation": "ecuatia citita",
+  "answer": "rezultatul final",
+  "steps": ""
+}
+Nu explica pasii.
+"""
+
+
+@app.route("/process_math", methods=["POST"])
+def process_math():
+    started_at = time.perf_counter()
+
+    try:
+        data = request.get_json(silent=True) or {}
+        image_data = data.get("image_data")
+        step_by_step = bool(data.get("step_by_step", False))
+        encoded_image = extract_base64_image(image_data)
+
+        response = ollama.generate(
+            model=OLLAMA_MODEL,
+            prompt=build_prompt(step_by_step),
+            images=[encoded_image],
+            format="json",
+            keep_alive="10m",
+            options={
+                "temperature": 0,
+                "num_predict": 360 if step_by_step else 120,
+                "num_ctx": 2048,
+            },
+        )
+
+        ai_data = read_ollama_json(response["response"])
+
+        return jsonify(
+            {
                 "success": True,
-                "equation": detected_equation,
-                "answer": str(result),
-                "steps": "Calculat cu succes local."
-            })
-        except:
-            return jsonify({
-                "success": False,
-                "equation": detected_equation,
-                "message": f"Ecuație invalidă: {detected_equation}"
-            })
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)})
-if __name__ == '__main__':
+                "equation": ai_data.get("equation", ""),
+                "answer": ai_data.get("answer", ""),
+                "steps": normalize_steps(ai_data.get("steps", "")),
+                "is_explain": step_by_step,
+                "elapsed_seconds": round(time.perf_counter() - started_at, 2),
+            }
+        )
+
+    except Exception as error:
+        return jsonify({"success": False, "error": str(error)}), 400
+
+
+if __name__ == "__main__":
     app.run(debug=True, port=5000)
