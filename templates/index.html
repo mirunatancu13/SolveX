@@ -3,37 +3,73 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SolveX Air - Fix</title>
+    <title>SolveX Air</title>
     
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
     
     <style>
-        /* [Păstrează stilurile tale CSS neschimbate până la .panel] */
-        :root { --bg-color: #121212; --panel-bg: #1e1e1e; --text-color: #ffffff; --accent: #bb86fc; --success: #03dac6; }
-        body { margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; background-color: var(--bg-color); color: var(--text-color); display: grid; grid-template-rows: auto 1fr auto; height: 100vh; overflow: hidden; }
-        #loadingScreen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), url('/static/bg.jpg') center/cover; z-index: 9999; display: flex; justify-content: center; align-items: center; transition: opacity 0.8s; }
+        * { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; box-sizing: border-box; }
+        :root { --bg-color: #121212; --panel-bg: #1e1e1e; --text-color: #ffffff; --accent: #bb86fc; --success: #dea430; }
+        
+        body { margin: 0; padding: 0; background-color: var(--bg-color); color: var(--text-color); display: grid; grid-template-rows: auto 1fr auto; height: 100vh; overflow: hidden; }
+        
+        /* --- TRANZITIA NINJA JUMP --- */
+        #loadingScreen { 
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; 
+            background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), url('/static/bg.jpg') center/cover; 
+            z-index: 9999; display: flex; justify-content: center; align-items: center; transition: opacity 0.8s; 
+        }
         .logo-container { font-size: 5rem; font-weight: bold; color: white; position: relative; display: flex; align-items: baseline; }
-        .x-text { color: var(--accent); position: absolute; left: -80px; animation: ninjaJump 2.2s cubic-bezier(0.25, 0.1, 0.25, 1) forwards; }
-        @keyframes ninjaJump { 0% { transform: translate(0, 0) scale(0) rotate(0deg); opacity: 0; } 10% { transform: translate(27px, 0) scale(1) rotate(0deg); opacity: 1; } 25% { transform: translate(45px, -120px) rotate(90deg); } 40% { transform: translate(124px, -45px) rotate(180deg); } 55% { transform: translate(145px, -120px) rotate(270deg); } 70% { transform: translate(195px, -50px) rotate(360deg); } 85% { transform: translate(235px, -80px) rotate(450deg); } 100% { transform: translate(280px, 12px) rotate(540deg); opacity: 1; } }
-        #welcomeScreen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(18, 18, 18, 0.95); z-index: 9998; display: none; justify-content: center; align-items: center; transition: opacity 0.5s; opacity: 1; }
+        .x-text { 
+            color: var(--accent); position: absolute; left: -80px; 
+            animation: ninjaJump 2.2s cubic-bezier(0.25, 0.1, 0.25, 1) forwards; 
+        }
+
+        @keyframes ninjaJump { 
+            0% { transform: translate(0, 0) scale(0) rotate(0deg); opacity: 0; } 
+            10% { transform: translate(27px, 0) scale(1) rotate(0deg); opacity: 1; } 
+            25% { transform: translate(45px, -120px) rotate(90deg); } 
+            40% { transform: translate(124px, -45px) rotate(180deg); } 
+            55% { transform: translate(145px, -120px) rotate(270deg); } 
+            70% { transform: translate(195px, -50px) rotate(360deg); } 
+            85% { transform: translate(235px, -80px) rotate(450deg); } 
+            100% { transform: translate(280px, 12px) rotate(540deg); opacity: 1; } 
+        }
+
+        #welcomeScreen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(18, 18, 18, 0.95); z-index: 9998; display: none; justify-content: center; align-items: center; transition: opacity 0.5s; }
         .welcome-card { background: var(--panel-bg); padding: 40px; border-radius: 20px; text-align: center; border: 1px solid #333; }
-        #startBtn { background: var(--success); color: black; border: none; padding: 15px 40px; border-radius: 50px; cursor: pointer; font-weight: bold; font-size: 1.2rem; transition: 0.2s; }
-        .header, .container { opacity: 0; pointer-events: none; transition: opacity 0.8s; }
-        .header { text-align: center; padding: 10px; font-weight: 300; letter-spacing: 2px; }
+        .logo-x { color: var(--accent); font-weight: bold; }
+
+        #startBtn { background: var(--success); color: black; border: none; padding: 15px 40px; border-radius: 12px; cursor: pointer; font-weight: bold; font-size: 1.2rem; margin-top: 20px; }
+        
+        .header, .container { opacity: 0; transition: opacity 0.8s; pointer-events: none; }
+        .header { text-align: center; padding: 10px; }
         .container { position: relative; width: 100%; height: 100%; }
-        .panel { position: absolute; background: var(--panel-bg); border-radius: 15px; padding: 10px; display: flex; flex-direction: column; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 2px solid #444; min-width: 300px; min-height: 250px; resize: both; overflow: hidden; z-index: 100; }
-        .panel-header { cursor: grab; padding: 10px; text-align: center; color: #888; background: #1a1a1a; margin: -10px -10px 10px -10px; font-size: 12px; letter-spacing: 1px; }
-        .whiteboard-container, video { flex: 1; width: 100%; height: 100%; background: #000; position: relative; border-radius: 8px; overflow: hidden; }
-        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: block; }
-        #aiPanel { position: fixed; top: 20px; right: -400px; width: 350px; height: calc(100vh - 120px); background: rgba(30, 30, 30, 0.95); border-left: 3px solid var(--accent); z-index: 2000; padding: 20px; transition: right 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); border-radius: 20px 0 0 20px; backdrop-filter: blur(10px); display: flex; flex-direction: column; }
+
+        .panel { position: absolute; background: var(--panel-bg); border-radius: 15px; padding: 10px; display: flex; flex-direction: column; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 2px solid #444; min-width: 300px; min-height: 250px; z-index: 100; overflow: hidden; }
+        .panel-header { cursor: grab; padding: 10px; text-align: center; color: #888; background: #1a1a1a; margin: -10px -10px 10px -10px; font-size: 12px; user-select: none; }
+        
+        .whiteboard-container, video { flex: 1; width: 100%; height: 100%; background: #000; position: relative; border-radius: 8px; }
+        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+
+        #aiPanel { position: fixed; top: 20px; right: -400px; width: 350px; height: calc(100vh - 120px); background: rgba(30, 30, 30, 0.95); border-left: 3px solid var(--accent); z-index: 2000; padding: 20px; transition: right 0.5s; border-radius: 20px 0 0 20px; backdrop-filter: blur(10px); display: flex; flex-direction: column; }
         #aiPanel.open { right: 0; }
-        .ai-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #444; padding-bottom: 10px; }
-        .ai-content { flex: 1; overflow-y: auto; margin-top: 15px; }
         .ai-section { background: rgba(255,255,255,0.05); padding: 12px; border-radius: 10px; margin-bottom: 15px; border-left: 3px solid var(--success); }
-        .bottom-controls { background: #1a1a1a; padding: 20px; display: flex; gap: 15px; justify-content: center; border-top: 1px solid #333; z-index: 1001; opacity: 0; pointer-events: none; transition: opacity 0.8s ease; }
-        .bottom-controls button { background: var(--accent); color: black; border: none; padding: 12px 25px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s; }
-        #fileInput { display: none; }
+
+        .bottom-controls { 
+            position: fixed; bottom: 25px; left: 50%; transform: translateX(-50%) translateY(100px); 
+            background: rgba(30, 30, 30, 0.7); backdrop-filter: blur(20px); 
+            padding: 12px 25px; display: none; gap: 10px; align-items: center; 
+            border-radius: 24px; border: 1px solid rgba(255, 255, 255, 0.1); 
+            z-index: 1001; opacity: 0; transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .bottom-controls button { border: none; padding: 10px 18px; border-radius: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; color: white; background: #333; transition: 0.2s; }
+        .bottom-controls button:hover { transform: translateY(-5px); filter: brightness(1.2); }
+        .btn-separator { width: 1px; height: 25px; background: rgba(255,255,255,0.2); margin: 0 5px; }
+        .btn-solve { background: var(--success) !important; color: black !important; }
+        .btn-steps { background: var(--accent) !important; color: black !important; }
+        .btn-clear { background: #cf6679 !important; }
     </style>
 </head>
 <body>
@@ -42,27 +78,30 @@
     
     <div id="welcomeScreen">
         <div class="welcome-card">
-            <h2>SolveX Air</h2>
-            <p>Pregătit? Desenează în aer sau încarcă o imagine.</p>
-            <button id="startBtn">START APLICAȚIE</button>
+            <h2>Solve<span class="logo-x">X</span></h2>
+            <p>Ready? Draw in the air or upload an image of your equation.</p>
+            <button id="startBtn">Begin</button>
         </div>
     </div>
-
+  
     <div id="aiPanel">
-        <div class="ai-header"><h3>✨ SolveX Assistant</h3><button onclick="toggleAiPanel(false)" style="background:none; border:none; color:white; font-size:24px; cursor:pointer;">×</button></div>
-        <div id="aiResponseContent" class="ai-content"></div>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h2>Solve<span class="logo-x">X</span> Assistant</h2>
+            <button onclick="toggleAiPanel(false)" style="background:none; border:none; color:white; font-size:24px; cursor:pointer;">×</button>
+        </div>
+        <div id="aiResponseContent" style="flex:1; overflow-y:auto; margin-top:15px;"></div>
     </div>
 
-    <div class="header"><h1>SolveX Air</h1></div>
+    <div class="header"><h1>Solve<span class="logo-x">X</span> Air</h1></div>
 
     <div class="container">
         <div id="camPanel" class="panel" style="top: 50px; left: 50px; width: 400px; height: 300px;">
-            <div class="panel-header">⋮⋮ CAMERĂ</div>
+            <div class="panel-header">⋮⋮ Camera</div>
             <video id="videoElement" autoplay playsinline style="transform: scaleX(-1);"></video>
         </div>
 
         <div id="boardPanel" class="panel" style="top: 50px; right: 50px; width: 650px; height: 480px;">
-            <div class="panel-header">⋮⋮ TABLĂ MATEMATICĂ</div>
+            <div class="panel-header">⋮⋮ Whiteboard</div>
             <div class="whiteboard-container" id="boardContainer">
                 <canvas id="canvas-bg"></canvas>
                 <canvas id="canvas-img"></canvas>
@@ -73,21 +112,22 @@
     </div>
 
     <div class="bottom-controls">
-
-        <button style="background:#ff7675; color:white;" onclick="undoLast()">↩️ Undo</button>
-        <button style="background:#ff7675; color:white;" onclick="redoLast()"> Redo</button>
-        
-        <button onclick="setMode('pen')">✒️ Creion</button>
-        <button onclick="setMode('eraser')">🧽 Gumă</button>
-        <button style="background:#cf6679; color:white;" onclick="clearCanvas()">🗑️ Șterge</button>
-        <button style="background:#ffb74d;" onclick="document.getElementById('fileInput').click()">📂 Încarcă</button>
-        <input type="file" id="fileInput" accept="image/*" onchange="loadImage(event)">
-        <button style="background:#03dac6;" onclick="processMath(false)">Rezolvă</button>
-        <button style="background:#bb86fc;" onclick="processMath(true)">Pas cu Pas</button>
+        <button onclick="undoLast()">↩ Undo</button>
+        <button onclick="redoLast()">↪ Redo</button>
+        <div class="btn-separator"></div>
+        <button onclick="setMode('pen')">✍🏼 Pen</button>
+        <button onclick="setMode('eraser')">🧽 Eraser</button>
+        <button class="btn-clear" onclick="clearCanvas()">🗑️</button>
+        <div class="btn-separator"></div>
+        <button style="background:#444;" onclick="document.getElementById('fileInput').click()">📂 Upload</button>
+        <input type="file" id="fileInput" accept="image/*" onchange="loadImage(event)" style="display: none;">
+        <div class="btn-separator"></div>
+        <button class="btn-solve" onclick="processMath(false)">Solve</button>
+        <button class="btn-steps" onclick="processMath(true)">Explain</button>
     </div>
 
     <script>
-        // --- TRANZIȚII ȘI LOADING ---
+        // --- UI & LOADING ---
         window.addEventListener('load', () => {
             setTimeout(() => {
                 document.getElementById('loadingScreen').style.opacity = '0';
@@ -95,285 +135,185 @@
                     document.getElementById('loadingScreen').style.display = 'none';
                     document.getElementById('welcomeScreen').style.display = 'flex';
                 }, 800);
-            }, 2300);
+            }, 2300); // Sincronizat cu ninjaJump
         });
 
         document.getElementById('startBtn').addEventListener('click', () => {
             document.getElementById('welcomeScreen').style.opacity = '0';
             setTimeout(() => {
                 document.getElementById('welcomeScreen').style.display = 'none';
-                document.querySelector('.header').style.opacity = '1';
-                document.querySelector('.container').style.opacity = '1';
-                document.querySelector('.header').style.pointerEvents = 'auto';
-                document.querySelector('.container').style.pointerEvents = 'auto';
-                document.querySelector('.bottom-controls').style.opacity = '1';
-                document.querySelector('.bottom-controls').style.pointerEvents = 'auto';
                 
+                // Afișăm interfața
+                const header = document.querySelector('.header');
+                const container = document.querySelector('.container');
+                header.style.opacity = '1';
+                header.style.pointerEvents = 'auto';
+                container.style.opacity = '1';
+                container.style.pointerEvents = 'auto';
+
+                const ctrl = document.querySelector('.bottom-controls');
+                ctrl.style.display = 'flex';
+                setTimeout(() => {
+                    ctrl.style.opacity = '1';
+                    ctrl.style.transform = 'translateX(-50%) translateY(0)';
+                }, 50);
+
                 initCanvasSize();
                 if (typeof camera !== 'undefined') camera.start();
             }, 500);
         });
 
-        // --- DRAG ---
+        // --- DRAGGABLE ---
         function makeDraggable(el) {
             const header = el.querySelector('.panel-header');
-            header.onmousedown = (e) => {
+            header.onmousedown = function(e) {
                 let pos3 = e.clientX, pos4 = e.clientY;
                 document.querySelectorAll('.panel').forEach(p => p.style.zIndex = 100);
                 el.style.zIndex = 1000;
-                document.onmousemove = (e) => {
+                document.onmousemove = function(e) {
                     el.style.top = (el.offsetTop - (pos4 - e.clientY)) + "px";
                     el.style.left = (el.offsetLeft - (pos3 - e.clientX)) + "px";
                     pos3 = e.clientX; pos4 = e.clientY;
                 };
-                document.onmouseup = () => { document.onmousemove = null; };
+                document.onmouseup = () => document.onmousemove = null;
             };
         }
-        makeDraggable(document.getElementById('camPanel'));
-        makeDraggable(document.getElementById('boardPanel'));
 
-        // --- CANVAS ---
-        const boardContainer = document.getElementById('boardContainer');
+        // --- CANVAS LOGIC ---
         const board = document.getElementById('whiteboard');
         const ctx = board.getContext('2d');
         const bgCtx = document.getElementById('canvas-bg').getContext('2d');
         const imgCtx = document.getElementById('canvas-img').getContext('2d');
         const overlayCtx = document.getElementById('whiteboard-overlay').getContext('2d');
         
-        let last_x = null, last_y = null;
-        let isEraser = false;
-        let strokes = []; 
-        let redoStack = []
-        let currentStroke = null;
+        let strokes = [], redoStack = [], currentStroke = null;
+        let last_x = null, last_y = null, isEraser = false;
 
         function initCanvasSize() {
-            const rect = boardContainer.getBoundingClientRect();
+            const container = document.getElementById('boardContainer');
+            const rect = container.getBoundingClientRect();
             [board, document.getElementById('canvas-bg'), document.getElementById('canvas-img'), document.getElementById('whiteboard-overlay')].forEach(c => {
                 c.width = rect.width;
                 c.height = rect.height;
             });
-            drawGrid();
+            bgCtx.fillStyle = "#121212";
+            bgCtx.fillRect(0, 0, bgCtx.canvas.width, bgCtx.canvas.height);
             redrawAll();
-        }
-
-        // FIX: ResizeObserver separat, nu în interiorul initCanvasSize
-        const resizeObserver = new ResizeObserver(() => {
-            initCanvasSize();
-        });
-        resizeObserver.observe(document.getElementById('boardPanel'));
-
-        function drawGrid() {
-            bgCtx.fillStyle = "black"; bgCtx.fillRect(0,0,bgCtx.canvas.width, bgCtx.canvas.height);
-            bgCtx.strokeStyle = "grey"; bgCtx.lineWidth = 1; bgCtx.setLineDash([5,5]);
-            let stepX = bgCtx.canvas.width / 5;
-            let stepY = bgCtx.canvas.height / 4;
-            bgCtx.beginPath();
-            for(let i=1; i<5; i++) { bgCtx.moveTo(i*stepX,0); bgCtx.lineTo(i*stepX,bgCtx.canvas.height); }
-            for(let j=1; j<4; j++) { bgCtx.moveTo(0,j*stepY); bgCtx.lineTo(bgCtx.canvas.width,j*stepY); }
-            bgCtx.stroke();
         }
 
         function setMode(m) { isEraser = (m === 'eraser'); }
 
         function draw(x, y, writing) {
-                    if (!writing) {
-                if (currentStroke) {
-                    strokes.push(currentStroke);
-                    currentStroke = null;
-                    redoStack = []; // <--- ADAUGĂ ASTA: Șterge istoricul de Redo când desenezi ceva nou
-                }
+            if (!writing) {
+                if (currentStroke) { strokes.push(currentStroke); currentStroke = null; redoStack = []; }
                 last_x = null; last_y = null;
                 return;
             }
-
-            if (!currentStroke) {
-                currentStroke = { points: [], isEraser: isEraser, color: '#2d3436', width: isEraser ? 40 : 8 };
-            }
-
+            if (!currentStroke) currentStroke = { points: [], isEraser: isEraser, width: isEraser ? 40 : 8 };
             currentStroke.points.push({x, y});
-
             ctx.globalCompositeOperation = isEraser ? "destination-out" : "source-over";
             ctx.lineWidth = isEraser ? 40 : 8;
             ctx.lineCap = 'round';
             ctx.strokeStyle = '#ffffff';
             ctx.beginPath();
-            
-            if (last_x !== null) {
-                ctx.moveTo(last_x, last_y);
-                ctx.lineTo(x, y);
-                ctx.stroke();
-            } else {
-                ctx.arc(x, y, ctx.lineWidth / 2, 0, Math.PI * 2);
-                ctx.fillStyle = '#2d3436';
-                ctx.fill();
-            }
+            if (last_x !== null) { ctx.moveTo(last_x, last_y); ctx.lineTo(x, y); ctx.stroke(); }
             last_x = x; last_y = y;
         }
 
-        function undoLast() {
-                if (strokes.length > 0) {
-                const lastStroke = strokes.pop(); // Scoate ultima linie
-                redoStack.push(lastStroke);      // O salvează în stiva de Redo
-                redrawAll();                     // Curăță și redesenează tot ce a rămas
-            }
-        }
-
-        function redoLast() { 
-                    if (redoStack.length > 0) {
-                const recoveredStroke = redoStack.pop(); // Ia linia din stiva Redo
-                strokes.push(recoveredStroke);           // O pune înapoi în desenul activ
-                redrawAll();                             // Redesenează
-            }
-         }
-
         function redrawAll() {
-                    ctx.clearRect(0, 0, board.width, board.height);
-
-            // 2. Desenează fiecare linie din lista 'strokes'
+            ctx.clearRect(0, 0, board.width, board.height);
             strokes.forEach(s => {
                 ctx.beginPath();
                 ctx.globalCompositeOperation = s.isEraser ? "destination-out" : "source-over";
                 ctx.lineWidth = s.width;
+                ctx.strokeStyle = "#ffffff";
                 ctx.lineCap = 'round';
-                ctx.lineJoin = 'round';
-
-                if (!s.isEraser) {
-                    ctx.strokeStyle = "#ffffff"; // Alb pentru tema dark
-                    ctx.shadowBlur = 15;
-                    ctx.shadowColor = "#bb86fc"; // Neon
-                }
-
                 if (s.points.length > 0) {
                     ctx.moveTo(s.points[0].x, s.points[0].y);
                     s.points.forEach(p => ctx.lineTo(p.x, p.y));
                     ctx.stroke();
                 }
-                ctx.shadowBlur = 0; // Reset pentru performanță
             });
         }
 
-        function clearCanvas() {
-            strokes = [];
-            ctx.clearRect(0, 0, board.width, board.height);
-            imgCtx.clearRect(0, 0, board.width, board.height);
+        function undoLast() { if(strokes.length) { redoStack.push(strokes.pop()); redrawAll(); } }
+        function redoLast() { if(redoStack.length) { strokes.push(redoStack.pop()); redrawAll(); } }
+        function clearCanvas() { strokes = []; redoStack = []; ctx.clearRect(0,0,board.width, board.height); imgCtx.clearRect(0,0,board.width, board.height); }
+
+        function loadImage(event) {
+            const file = event.target.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    imgCtx.clearRect(0,0,board.width, board.height);
+                    imgCtx.drawImage(img, 0, 0, board.width, board.height);
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
         }
 
-        // --- MEDIAPIPE ---
-        const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
-        hands.setOptions({maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.75, minTrackingConfidence: 0.7});
+        function toggleAiPanel(o) { document.getElementById('aiPanel').classList.toggle('open', o); }
         
+        async function processMath(sbs) {
+            toggleAiPanel(true);
+            document.getElementById('aiResponseContent').innerHTML = "SolveX is thinking...";
+            const temp = document.createElement('canvas');
+            temp.width = board.width; temp.height = board.height;
+            const tCtx = temp.getContext('2d');
+            tCtx.fillStyle = "white";
+            tCtx.fillRect(0, 0, temp.width, temp.height);
+            tCtx.drawImage(document.getElementById('canvas-img'), 0, 0, temp.width, temp.height);
+            tCtx.strokeStyle = "black"; tCtx.lineWidth = 10; tCtx.lineCap = "round";
+            strokes.forEach(s => {
+                if(!s.isEraser) {
+                    tCtx.beginPath();
+                    tCtx.moveTo(s.points[0].x, s.points[0].y);
+                    s.points.forEach(p => tCtx.lineTo(p.x, p.y));
+                    tCtx.stroke();
+                }
+            });
+
+            try {
+                const res = await fetch('/process_math', { 
+                    method: 'POST', 
+                    headers: {'Content-Type':'application/json'}, 
+                    body: JSON.stringify({ image_data: temp.toDataURL('image/png'), step_by_step: sbs }) 
+                });
+                const data = await res.json();
+                if(data.success) {
+                    document.getElementById('aiResponseContent').innerHTML = `
+                        <div class="ai-section"><b>Equation:</b> ${data.equation}</div>
+                        <div class="ai-section"><b>Result:</b> ${data.answer}</div>
+                    `;
+                }
+            } catch(e) { document.getElementById('aiResponseContent').innerHTML = "Error!"; }
+        }
+
+        const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+        hands.setOptions({maxNumHands: 1, minDetectionConfidence: 0.7});
         hands.onResults(res => {
             overlayCtx.clearRect(0,0,overlayCtx.canvas.width, overlayCtx.canvas.height);
             if(res.multiHandLandmarks && res.multiHandLandmarks.length > 0) {
                 const lm = res.multiHandLandmarks[0];
                 const x = (1-lm[8].x) * board.width;
                 const y = lm[8].y * board.height;
-                
-                const dx = lm[8].x - lm[12].x;
-                const dy = lm[8].y - lm[12].y;
-                const dist = Math.sqrt(dx*dx + dy*dy);
-                const writing = dist < 0.06;
-                
+                const writing = Math.sqrt(Math.pow(lm[8].x-lm[12].x, 2) + Math.pow(lm[8].y-lm[12].y, 2)) < 0.06;
                 draw(x, y, writing);
-                
-                overlayCtx.fillStyle = isEraser ? "rgba(187, 134, 252, 0.4)" : "#bb86fc";
-                overlayCtx.beginPath(); 
-                overlayCtx.arc(x,y, isEraser ? 20 : 6, 0, Math.PI*2); 
-                overlayCtx.fill();
+                overlayCtx.fillStyle = "#bb86fc";
+                overlayCtx.beginPath(); overlayCtx.arc(x,y, 8, 0, Math.PI*2); overlayCtx.fill();
             }
         });
-
         const camera = new Camera(document.getElementById('videoElement'), {
             onFrame: async () => await hands.send({image: document.getElementById('videoElement')}),
             width: 640, height: 480
         });
 
-        // --- AI LOGIC ---
-        // --- AI ---
-        function toggleAiPanel(o) { document.getElementById('aiPanel').classList.toggle('open', o); }
-        
-       async function processMath(sbs) {
-    toggleAiPanel(true); 
-    const content = document.getElementById('aiResponseContent');
-    content.innerHTML = "🔄 Analiză în curs...";
-
-    // Pregătirea imaginii (Alb-Negru pentru AI)
-    const temp = document.createElement('canvas'); 
-    temp.width = board.width; 
-    temp.height = board.height;
-    const tCtx = temp.getContext('2d'); 
-    
-    tCtx.fillStyle = "white"; 
-    tCtx.fillRect(0, 0, temp.width, temp.height);
-    tCtx.drawImage(document.getElementById('canvas-img'), 0, 0); 
-    
-    // Desenăm liniile tale cu negru pentru contrast maxim
-    strokes.forEach(s => {
-        tCtx.beginPath();
-        tCtx.globalCompositeOperation = "source-over";
-        tCtx.lineWidth = s.width; 
-        tCtx.lineCap = 'round'; 
-        tCtx.lineJoin = 'round';
-        tCtx.strokeStyle = s.isEraser ? "white" : "black"; 
-        
-        if(s.points.length) {
-            tCtx.moveTo(s.points[0].x, s.points[0].y);
-            s.points.forEach(p => tCtx.lineTo(p.x, p.y));
-            tCtx.stroke();
-        }
-    });
-
-    try {
-        const res = await fetch('/process_math', { 
-            method: 'POST', 
-            headers: {'Content-Type':'application/json'}, 
-            body: JSON.stringify({
-                image_data: temp.toDataURL(), 
-                step_by_step: sbs // Trimitem parametrul la server
-            }) 
-        });
-        
-        const data = await res.json();
-        
-        if(data.success) { 
-            content.innerHTML = `
-                <div class="ai-section">
-                    <b>Ecuație detectată:</b><br>${data.equation}
-                </div>
-                <div class="ai-section" style="border-left-color:var(--accent)">
-                    <b>Rezultat final:</b><br>${data.answer}
-                </div>
-                ${sbs && data.steps ? `
-                <div class="ai-section" style="border-left-color:var(--success)">
-                    <b>Explicație pas cu pas:</b><br>
-                    <div style="font-size: 0.9rem; line-height: 1.4;">${data.steps}</div>
-                </div>` : ''}
-            `; 
-        } else {
-            content.innerHTML = `<div class="ai-section" style="border-color:var(--danger)">⚠️ Eroare: ${data.message || 'AI-ul nu a putut procesa imaginea.'}</div>`;
-        }
-    } catch(e) { 
-        content.innerHTML = `<div class="ai-section" style="border-color:var(--danger)">❌ Eroare de conexiune la server.</div>`; 
-    }
-}
-        function loadImage(event) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const img = new Image();
-                img.onload = () => {
-                    imgCtx.clearRect(0,0,imgCtx.canvas.width, imgCtx.canvas.height);
-                    imgCtx.drawImage(img, 0, 0, imgCtx.canvas.width, imgCtx.canvas.height);
-                };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(event.target.files[0]);
-        }
-
-        function clearCanvas() { 
-            strokes = []; 
-            ctx.clearRect(0,0,board.width, board.height); 
-            imgCtx.clearRect(0,0,board.width, board.height); 
-        }
+        // Initialize drag and resize
+        makeDraggable(document.getElementById('camPanel'));
+        makeDraggable(document.getElementById('boardPanel'));
     </script>
 </body>
 </html>

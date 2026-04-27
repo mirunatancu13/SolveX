@@ -1,18 +1,40 @@
 import os
 import base64
-import json
-import requests
+import cv2
+import numpy as np
 import pytesseract
 from PIL import Image
 import io
-import traceback
 from flask import Flask, render_template, request, jsonify
 
 app = Flask(__name__)
 
-# --- CONFIGURARE ---
-# Folosim ID-ul exact din poza ta
-WOLFRAM_APP_ID = "WW77W8HHE9" 
+# Dacă ești pe Windows, verifică calea către tesseract.exe
+# pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+
+def preprocess_for_ocr(image_bytes):
+    # 1. Transformăm byte-urile în format OpenCV
+    nparr = np.frombuffer(image_bytes, np.uint8)
+    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+    # 2. Convertim în GrayScale (alb-negru)
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+    # 3. Mărim imaginea (Resizing) - Tesseract citește mai bine caracterele mari
+    gray = cv2.resize(gray, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
+
+    # 4. Binarizare (Thresholding) - transformăm tot ce e scris în negru pur pe fundal alb pur
+    # Folosim OTSU pentru a calcula automat pragul optim de contrast
+    _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+
+    # 5. Dilation (Îngroșarea liniilor) - ajută dacă ai scris cu un creier subțire
+    kernel = np.ones((2,2), np.uint8)
+    thresh = cv2.dilate(thresh, kernel, iterations=1)
+
+    # 6. Invertim înapoi (Tesseract preferă text negru pe fundal alb)
+    final_img = cv2.bitwise_not(thresh)
+    
+    return final_img
 
 @app.route('/')
 def index():
@@ -23,74 +45,41 @@ def process_math():
     try:
         data = request.json
         image_data = data.get('image_data')
-        step_by_step = data.get('step_by_step', False)
-
-        # 1. OCR (Citirea textului)
         encoded_data = image_data.split(',')[1]
         image_bytes = base64.b64decode(encoded_data)
-        img = Image.open(io.BytesIO(image_bytes))
+
+        processed_img = preprocess_for_ocr(image_bytes)
+
+        # Folosim PSM 6 sau 7 și permitem citirea caracterelor matematice
+        custom_config = r'--oem 3 --psm 6 -c tessedit_char_whitelist=0123456789+-*/() '
+        detected_equation = pytesseract.image_to_string(processed_img, config=custom_config).strip()
+
+        # FIX pentru erori comune de OCR:
+        # Dacă Tesseract vede paranteze ca cifre, încercăm să curățăm
+        detected_equation = "".join(detected_equation.split())
         
-        # Îmbunătățim imaginea pentru OCR (opțional dar recomandat)
-        detected_equation = pytesseract.image_to_string(img, config='--psm 6').strip()
-        print(f"DEBUG OCR: {detected_equation}")
+        # Validare paranteze: dacă avem paranteză închisă dar nu și deschisă
+        if ")" in detected_equation and "(" not in detected_equation:
+            # Dacă ecuația începe cu o cifră care pare a fi paranteză (ex: 3 în loc de ()
+            if detected_equation[0] in "317": 
+                detected_equation = "(" + detected_equation[1:]
 
-        if not detected_equation:
-            return jsonify({"success": False, "message": "Nu am detectat nimic. Scrie mai clar!"})
-
-        # 2. CERERE CĂTRE WOLFRAM
-        # Folosim endpoint-ul de query dar cu format minimalist pentru a evita erorile de protocol
-        url = "http://api.wolframalpha.com/v2/query"
-        params = {
-            "appid": WOLFRAM_APP_ID,
-            "input": detected_equation,
-            "output": "json",
-            "format": "plaintext",
-        }
-
-        if step_by_step:
-            # Încercăm să activăm pașii dacă ID-ul permite
-            params["podstate"] = "Step-by-step solution"
-            params["input"] = f"solve {detected_equation}"
-
-        response = requests.get(url, params=params)
-        
-        # Dacă Wolfram dă eroare de autentificare
-        if response.status_code != 200:
-            return jsonify({"success": False, "message": f"Eroare API Wolfram: {response.status_code}"})
-
-        res_json = response.json()
-        queryresult = res_json.get("queryresult", {})
-
-        # 3. EXTRAGERE DATE
-        final_answer = "N/A"
-        steps_html = ""
-
-        if queryresult.get("success"):
-            pods = queryresult.get("pods", [])
-            for pod in pods:
-                # Căutăm rezultatul
-                if pod["title"] in ["Result", "Solution", "Solutions", "Value"]:
-                    final_answer = pod["subpods"][0]["plaintext"]
-                
-                # Căutăm pașii
-                if "step" in pod["title"].lower():
-                    for subpod in pod["subpods"]:
-                        pasi_text = subpod.get("plaintext", "")
-                        if pasi_text:
-                            steps_html += f"<div>{pasi_text.replace('\n', '<br>')}</div>"
-        else:
-            return jsonify({"success": False, "message": "Wolfram nu a putut rezolva această ecuație."})
-
-        return jsonify({
-            "success": True,
-            "equation": detected_equation,
-            "answer": final_answer,
-            "steps": steps_html if steps_html else "Pașii detaliați nu sunt disponibili pentru acest ID."
-        })
-
+        try:
+            # Calculăm rezultatul
+            result = eval(detected_equation, {"__builtins__": None}, {})
+            return jsonify({
+                "success": True,
+                "equation": detected_equation,
+                "answer": str(result),
+                "steps": "Calculat cu succes local."
+            })
+        except:
+            return jsonify({
+                "success": False,
+                "equation": detected_equation,
+                "message": f"Ecuație invalidă: {detected_equation}"
+            })
     except Exception as e:
-        traceback.print_exc()
         return jsonify({"success": False, "error": str(e)})
-
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
