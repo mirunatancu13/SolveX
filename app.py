@@ -49,9 +49,11 @@ Raspunde DOAR cu JSON valid, fara markdown:
 {
   "equation": "ecuatia citita",
   "answer": "rezultatul final",
-  "steps": ["pas scurt 1", "pas scurt 2", "pas scurt 3"]
+  "steps": ["1. pas complet", "2. pas complet", "3. pas complet"]
 }
-Pastreaza explicatia scurta, clara si corecta. Maximum 6 pasi.
+Scrie 3-6 pasi completi, clari si scurti.
+Nu folosi niciodata "...", "[...]", "etc." sau rezumate incomplete.
+Fiecare pas trebuie sa fie o propozitie completa.
 """
 
     return """
@@ -84,8 +86,8 @@ def process_math():
             keep_alive="10m",
             options={
                 "temperature": 0,
-                "num_predict": 360 if step_by_step else 120,
-                "num_ctx": 2048,
+                "num_predict": 900 if step_by_step else 160,
+                "num_ctx": 4096,
             },
         )
 

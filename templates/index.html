@@ -62,7 +62,7 @@
 
         #aiPanel { position: fixed; top: 20px; right: -400px; width: 350px; height: calc(100vh - 120px); background: rgba(30, 30, 30, 0.95); border-left: 3px solid var(--accent); z-index: 2000; padding: 20px; transition: right 0.5s; border-radius: 20px 0 0 20px; backdrop-filter: blur(10px); display: flex; flex-direction: column; }
         #aiPanel.open { right: 0; }
-        .ai-section { background: rgba(255,255,255,0.05); padding: 12px; border-radius: 10px; margin-bottom: 15px; border-left: 3px solid var(--success); }
+        .ai-section { background: rgba(255,255,255,0.05); padding: 12px; border-radius: 10px; margin-bottom: 15px; border-left: 3px solid var(--success); line-height: 1.45; overflow-wrap: anywhere; }
 
         .bottom-controls { 
             position: fixed; bottom: 25px; left: 50%; transform: translateX(-50%) translateY(100px); 
@@ -204,6 +204,13 @@
         const alpha = 0.5;
         let penColor = "#ffffff";
         let currentUploadedImage = null; // Pentru a ține minte imaginea încărcată
+        let mathVersion = 0;
+        let solutionCache = null;
+
+        function markMathChanged() {
+            mathVersion += 1;
+            solutionCache = null;
+        }
 
         function initCanvasSize() {
             const container = document.getElementById('boardContainer');
@@ -230,6 +237,7 @@
                 if (currentStroke && currentStroke.points.length > 0) {
                     strokes.push(currentStroke);
                     redoStack = [];
+                    markMathChanged();
                 }
                 currentStroke = null;
                 last_x = null; last_y = null;
@@ -286,13 +294,14 @@
             ctx.globalCompositeOperation = "source-over";
         }
 
-        function undoLast() { if(strokes.length) { redoStack.push(strokes.pop()); redrawAll(); } }
-        function redoLast() { if(redoStack.length) { strokes.push(redoStack.pop()); redrawAll(); } }
+        function undoLast() { if(strokes.length) { redoStack.push(strokes.pop()); redrawAll(); markMathChanged(); } }
+        function redoLast() { if(redoStack.length) { strokes.push(redoStack.pop()); redrawAll(); markMathChanged(); } }
         function clearCanvas() {
             strokes = []; redoStack = []; currentStroke = null;
             currentUploadedImage = null;
             ctx.clearRect(0, 0, board.width, board.height);
             imgCtx.clearRect(0, 0, board.width, board.height);
+            markMathChanged();
         }
 
         function loadImage(event) {
@@ -304,6 +313,7 @@
                 img.onload = () => {
                     currentUploadedImage = img; // Salvăm imaginea în memorie
                     drawUploadedImage();
+                    markMathChanged();
                 };
                 img.src = e.target.result;
             };
@@ -372,8 +382,48 @@
                 .replaceAll("'", "&#039;");
         }
 
+        function renderCachedMath(data, showSteps) {
+            let htmlContent = `
+                <div class="ai-section">
+                    <b style="color:var(--accent)">Equation</b><br>
+                    ${escapeHtml(data.equation)}
+                </div>
+                <div class="ai-section" style="border-left-color: #4caf50;">
+                    <b style="color:var(--success)">Final result:</b><br>
+                    <span style="font-size: 1.5rem; font-weight: bold;">${escapeHtml(data.answer)}</span>
+                </div>
+            `;
+
+            if (data.elapsed_seconds) {
+                htmlContent += `
+                    <div style="color:#888; font-size:0.85rem; margin-bottom:12px;">
+                        Took ${escapeHtml(data.elapsed_seconds)}s
+                    </div>
+                `;
+            }
+
+            if (showSteps && data.steps && data.steps !== "Direct calculus") {
+                htmlContent += `
+                    <div class="ai-section" style="border-left-color: #ffb74d;">
+                        <b style="color:var(--accent)">Explanation: </b><br>
+                        <div style="white-space: pre-line; margin-top:10px;">${escapeHtml(data.steps)}</div>
+                    </div>
+                `;
+            }
+
+            document.getElementById('aiResponseContent').innerHTML = htmlContent;
+        }
+
         async function processMath(sbs) {
             toggleAiPanel(true);
+
+            if (solutionCache && solutionCache.version === mathVersion) {
+                renderCachedMath(solutionCache.data, sbs);
+                return;
+            }
+
+            const requestVersion = mathVersion;
+
             document.getElementById('aiResponseContent').innerHTML = sbs
                 ? "SolveX is explaining..."
                 : "SolveX is solving...";
@@ -410,12 +460,19 @@
                 const res = await fetch('/process_math', { 
                     method: 'POST', 
                     headers: {'Content-Type':'application/json'}, 
-                    body: JSON.stringify({ image_data: cropAndResizeCanvas(temp).toDataURL('image/png'), step_by_step: sbs }) 
+                    body: JSON.stringify({ image_data: cropAndResizeCanvas(temp).toDataURL('image/png'), step_by_step: true }) 
                 });
                 
                 const data = await res.json();
                 
                 if(data.success) {
+                    solutionCache = { version: requestVersion, data };
+                    if (requestVersion !== mathVersion) {
+                        document.getElementById('aiResponseContent').innerHTML = "The board changed. Press Solve again.";
+                        return;
+                    }
+                    renderCachedMath(data, sbs);
+                    return;
                     // Construim interfața de bază (Ecuație + Rezultat)
                     let htmlContent = `
                         <div class="ai-section">
